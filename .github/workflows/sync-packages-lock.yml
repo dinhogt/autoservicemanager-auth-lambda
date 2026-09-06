@@ -1,0 +1,51 @@
+name: Sync Packages yarn.lock
+
+# One-shot: resolve @dinhogt/domain-shared via GITHUB_TOKEN and commit yarn.lock.
+# Prefer package "Manage Actions access" for this repo; falls back to PACKAGES_READ_TOKEN.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: read
+
+jobs:
+  sync-lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: develop
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@dinhogt'
+
+      - name: Resolve deps and update yarn.lock
+        run: yarn install
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Verify domain-shared in lockfile
+        run: |
+          grep -q '@dinhogt/domain-shared@' yarn.lock
+          grep -q 'npm.pkg.github.com' yarn.lock
+          yarn typecheck
+          yarn test
+
+      - name: Commit and push yarn.lock
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add yarn.lock
+          if git diff --cached --quiet; then
+            echo "yarn.lock already up to date"
+            exit 0
+          fi
+          git commit -m "chore: commit Packages-resolved yarn.lock for domain-shared"
+          git push origin HEAD:develop
