@@ -1,20 +1,26 @@
 # autoservicemanager-auth-lambda
 
-Lambda **authCpf** (Node 22): autentica cliente por CPF no RDS MySQL e emite **JWT RS256** (ADR-007).
+## Propósito
 
-Repositório standalone (pós-cisão). Validações CPF vêm de **`@dinhogt/domain-shared`** publicado no **GitHub Packages** pelo repo [autoservicemanager-app](https://github.com/dinhogt/autoservicemanager-app).
+Function serverless **authCpf**: valida CPF do cliente, consulta existência/status no RDS MySQL e devolve **JWT RS256** para o API Gateway Authorizer (rubrica Fase 3).
 
-**Docs de arquitetura (canônicos no app):** [RFC-003](https://github.com/dinhogt/autoservicemanager-app/blob/develop/docs/architecture/rfc-003-auth-lambda-rs256.md) · [ADR-007](https://github.com/dinhogt/autoservicemanager-app/blob/develop/docs/architecture/adr-007-jwt-rs256-api-gateway-authorizer.md) · [diagramas](https://github.com/dinhogt/autoservicemanager-app/blob/develop/docs/architecture/diagrams-fase3.md) · [release notes](https://github.com/dinhogt/autoservicemanager-app/blob/develop/docs/release-notes.md)
+## Tecnologias
 
-## Escopo neste repo
+Node.js 22  · TypeScript  · esbuild  · mysql2  · jsonwebtoken RS256  · `@dinhogt/domain-shared` (GitHub Packages)  · GitHub Actions OIDC
+
+**Docs canônicos (app):** [delivery-index](https://github.com/dinhogt/autoservicemanager-app/blob/develop/docs/architecture/delivery-index.md) · [RFC-003](https://github.com/dinhogt/autoservicemanager-app/blob/develop/docs/architecture/rfc-003-auth-lambda-rs256.md) · [ADR-007](https://github.com/dinhogt/autoservicemanager-app/blob/develop/docs/architecture/adr-007-jwt-rs256-api-gateway-authorizer.md) · [diagramas](https://github.com/dinhogt/autoservicemanager-app/blob/develop/docs/architecture/diagrams-fase3.md)
+
+## Escopo neste repo (diagrama)
 
 ```mermaid
 flowchart LR
-  APIGW[API Gateway POST /auth/cpf] --> Lambda[authCpf Lambda]
-  Lambda --> SM[Secrets Manager JWT + DB]
-  Lambda --> RDS[(RDS MySQL Cliente)]
-  Lambda --> PKG["@dinhogt/domain-shared\nGitHub Packages"]
-  Lambda -->|JWT RS256| Client[Cliente]
+  Client[Cliente] --> APIGW[API Gateway]
+  APIGW -->|POST /auth/cpf| Lambda[authCpf]
+  Lambda --> RDS[(RDS MySQL)]
+  Lambda --> SM[Secrets Manager]
+  Lambda --> PKG[domain-shared Packages]
+  Lambda -->|JWT RS256| Client
+  JWKS[JWKS S3 CloudFront] -.-> AuthZ[JWT Authorizer]
 ```
 
 | Inclui | Não inclui |
