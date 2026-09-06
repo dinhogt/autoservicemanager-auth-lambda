@@ -2,7 +2,7 @@
   "name": "autoservicemanager-auth-lambda",
   "version": "0.1.0",
   "private": true,
-  "description": "Lambda authCpf — JWT RS256 por CPF (ADR-007). Repo alvo: autoservicemanager-auth-lambda.",
+  "description": "Lambda authCpf — JWT RS256 por CPF (ADR-007). Repo: autoservicemanager-auth-lambda.",
   "license": "UNLICENSED",
   "main": "dist/handler.js",
   "engines": {
@@ -16,7 +16,7 @@
     "package": "yarn build && cd dist && zip -r ../auth-cpf.zip handler.js"
   },
   "dependencies": {
-    "@autoservicemanager/domain-shared": "file:../packages/domain-shared",
+    "@dinhogt/domain-shared": "0.1.0",
     "@aws-sdk/client-secrets-manager": "^3.787.0",
     "jsonwebtoken": "^9.0.3",
     "mysql2": "^3.14.0"

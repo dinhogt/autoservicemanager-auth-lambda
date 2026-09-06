@@ -6,6 +6,9 @@ on:
 jobs:
   security-gate:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@v5
 
@@ -14,10 +17,19 @@ jobs:
         with:
           node-version: "22"
           cache: yarn
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@dinhogt'
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: |
+          if [ -f yarn.lock ] && grep -q '@dinhogt/domain-shared@' yarn.lock; then
+            yarn install --frozen-lockfile
+          else
+            yarn install
+          fi
         continue-on-error: true
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Run security gate
         run: bash scripts/security-gate.sh

@@ -1,6 +1,6 @@
 name: Auth Lambda CI/CD
 
-# Standalone repo (pós-cisão). domain-shared via Packages = Fase B.
+# Standalone repo. Install @dinhogt/domain-shared from GitHub Packages.
 # OIDC → IAM (ADR-009). Sem AWS_ACCESS_KEY_ID.
 
 on:
@@ -20,6 +20,9 @@ jobs:
   ci:
     needs: security-gate
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@v5
 
@@ -27,9 +30,20 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: yarn
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@dinhogt'
 
       - name: Install lambda deps
-        run: yarn install --frozen-lockfile
+        # Prefer GITHUB_TOKEN after package "Manage Actions access" includes this repo.
+        # Fallback: repo secret PACKAGES_READ_TOKEN (classic PAT with read:packages).
+        run: |
+          if [ -f yarn.lock ] && grep -q '@dinhogt/domain-shared@' yarn.lock; then
+            yarn install --frozen-lockfile
+          else
+            yarn install
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Typecheck
         run: yarn typecheck
@@ -54,6 +68,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
+      packages: read
     environment: ${{ github.ref == 'refs/heads/master' && 'production' || 'homolog' }}
     steps:
       - uses: actions/checkout@v5
@@ -61,11 +76,19 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@dinhogt'
 
       - name: Build lambda zip
         run: |
-          yarn install --frozen-lockfile
+          if [ -f yarn.lock ] && grep -q '@dinhogt/domain-shared@' yarn.lock; then
+            yarn install --frozen-lockfile
+          else
+            yarn install
+          fi
           yarn package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v5

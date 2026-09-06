@@ -1,4 +1,4 @@
-import { isValidCpfCnpj, onlyDigits } from '@autoservicemanager/domain-shared';
+import { isValidCpfCnpj, onlyDigits } from '@dinhogt/domain-shared';
 import type { FindClienteByCpf } from './db';
 import { signClienteJwt } from './jwt';
 import type { AuthCpfSuccess, JwtSigningConfig } from './types';
