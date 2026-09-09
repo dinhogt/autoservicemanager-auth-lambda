@@ -20,13 +20,17 @@ flowchart LR
   Lambda --> SM[Secrets Manager]
   Lambda --> PKG[domain-shared Packages]
   Lambda -->|JWT RS256| Client
+  SNS[SNS os-notifications] --> Notify[notify-os]
+  Notify --> SES[SES]
   JWKS[JWKS S3 CloudFront] -.-> AuthZ[JWT Authorizer]
 ```
 
 | Inclui | Não inclui |
 |--------|------------|
-| Handler, testes, esbuild zip, CI/CD Lambda | NestJS app, Terraform, manifests K8s |
+| Handlers auth + notify-os, testes, esbuild zips, CI/CD | NestJS app, Terraform, manifests K8s |
 | Consumo de `domain-shared` via Packages | Publicação do pacote (feita no app) |
+
+**Dockerfile:** N/A — deploy via zip `UpdateFunctionCode` (não container image).
 
 ## Contrato
 
@@ -80,20 +84,10 @@ export NODE_AUTH_TOKEN=ghp_...
 yarn install
 yarn test
 yarn build   # → dist/handler.js (esbuild bundle)
-yarn package # → auth-cpf.zip
+yarn package # → auth-cpf.zip + notify-os.zip
 ```
 
 `.npmrc` aponta `@dinhogt` para `https://npm.pkg.github.com`.
-
-## domain-shared: publish (app) → consume (lambda)
-
-1. **App** ([autoservicemanager-app](https://github.com/dinhogt/autoservicemanager-app)): bump `packages/domain-shared/package.json`, publish via tag `domain-shared-v*` ou `workflow_dispatch` em [`publish-domain-shared.yml`](https://github.com/dinhogt/autoservicemanager-app/blob/develop/.github/workflows/publish-domain-shared.yml).
-2. Pacote `@dinhogt/domain-shared` fica no GitHub Packages (escopo = owner; plano citava `@autoservicemanager/domain-shared`).
-3. **Acesso Actions (obrigatório uma vez):** no package → **Package settings** → **Manage Actions access** → adicionar `autoservicemanager-auth-lambda` (read). Sem isso o `GITHUB_TOKEN` deste repo não baixa o pacote.
-4. **Este repo:** `"@dinhogt/domain-shared": "0.1.0"` + `.npmrc`. CI: `packages:read` + `NODE_AUTH_TOKEN` (`GITHUB_TOKEN` ou secret opcional `PACKAGES_READ_TOKEN` com `read:packages`).
-5. Gerar lock local (token com `read:packages`): `export NODE_AUTH_TOKEN=... && yarn install` e commitar `yarn.lock`.
-
-Swagger / Postman da API Nest: no [app](https://github.com/dinhogt/autoservicemanager-app#documentação-da-api-swagger) · [Postman](https://github.com/dinhogt/autoservicemanager-app/blob/develop/docs/postman/autoservicemanager.postman_collection.json).
 
 ## CI/CD
 
@@ -101,12 +95,12 @@ Workflows: [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml) + [`secu
 
 | Evento | Ação |
 |--------|------|
-| PR | `security-gate` → install (Packages) → typecheck → test → bundle |
-| Push `develop` | CD homolog: OIDC → `UpdateFunctionCode` |
-| Push `master` | CD production: OIDC → `UpdateFunctionCode` |
+| PR | `security-gate` ∥ CI: install → typecheck → test → `yarn package` |
+| Push `develop` | CD homolog: download artefatos → OIDC → `UpdateFunctionCode` (auth + notify) |
+| Push `master` | CD production: idem |
 
-Secrets: `AWS_ROLE_ARN`, `AUTH_LAMBDA_NAME`. Sem monorepo `paths:` filters.
+**Proteção:** `master` só via Pull Request; `develop` → homolog; `master` → production. Secrets: `AWS_ROLE_ARN`, `AUTH_LAMBDA_NAME`, `NOTIFY_LAMBDA_NAME` (opcional até o stack k8s criar a function).
 
 ## Integração
 
-API Gateway HTTP API (stack [infra-k8s](https://github.com/dinhogt/autoservicemanager-infra-k8s)) rota `POST /auth/cpf` → esta Lambda. JWT Authorizer usa JWKS público gerado no mesmo stack.
+API Gateway HTTP API (stack [infra-k8s](https://github.com/dinhogt/autoservicemanager-infra-k8s)) rota `POST /auth/cpf` → Lambda auth. SNS `os-notifications` → Lambda notify-os → SES. JWT Authorizer usa JWKS público do mesmo stack.

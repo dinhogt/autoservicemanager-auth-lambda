@@ -13,11 +13,12 @@
     "test": "jest --config jest.config.cjs",
     "lint": "tsc -p tsconfig.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "package": "yarn build && cd dist && zip -r ../auth-cpf.zip handler.js"
+    "package": "yarn build && (cd dist && zip -j ../auth-cpf.zip handler.js) && (cd dist/notify-os && zip -j ../../notify-os.zip handler.js)"
   },
   "dependencies": {
     "@dinhogt/domain-shared": "0.1.0",
     "@aws-sdk/client-secrets-manager": "^3.787.0",
+    "@aws-sdk/client-ses": "^3.787.0",
     "jsonwebtoken": "^9.0.3",
     "mysql2": "^3.14.0"
   },

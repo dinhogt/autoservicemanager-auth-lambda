@@ -6,8 +6,17 @@ name: Auth Lambda CI/CD
 on:
   push:
     branches: [master, develop]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
   pull_request:
     branches: [master, develop]
+    paths-ignore:
+      - '**.md'
+
+concurrency:
+  group: auth-lambda-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   NODE_VERSION: '22'
@@ -18,7 +27,6 @@ jobs:
     uses: ./.github/workflows/security-gate.yml
 
   ci:
-    needs: security-gate
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -34,8 +42,6 @@ jobs:
           scope: '@dinhogt'
 
       - name: Install lambda deps
-        # Prefer GITHUB_TOKEN after package "Manage Actions access" includes this repo.
-        # Fallback: repo secret PACKAGES_READ_TOKEN (classic PAT with read:packages).
         run: |
           if [ -f yarn.lock ] && grep -q '@dinhogt/domain-shared@' yarn.lock; then
             yarn install --frozen-lockfile
@@ -51,44 +57,33 @@ jobs:
       - name: Test
         run: yarn test
 
-      - name: Bundle
-        run: yarn build
+      - name: Package zips (auth + notify)
+        run: yarn package
 
-      - name: Upload artifact
+      - name: Upload artifacts
         if: github.event_name == 'push'
         uses: actions/upload-artifact@v5
         with:
-          name: auth-cpf-bundle
-          path: dist/handler.js
+          name: lambda-zips
+          path: |
+            auth-cpf.zip
+            notify-os.zip
+          retention-days: 3
 
   cd:
     if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop')
     needs: [ci, security-gate]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       id-token: write
       contents: read
-      packages: read
     environment: ${{ github.ref == 'refs/heads/master' && 'production' || 'homolog' }}
     steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-node@v5
+      - name: Download artifacts
+        uses: actions/download-artifact@v5
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          registry-url: 'https://npm.pkg.github.com'
-          scope: '@dinhogt'
-
-      - name: Build lambda zip
-        run: |
-          if [ -f yarn.lock ] && grep -q '@dinhogt/domain-shared@' yarn.lock; then
-            yarn install --frozen-lockfile
-          else
-            yarn install
-          fi
-          yarn package
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN || secrets.GITHUB_TOKEN }}
+          name: lambda-zips
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v5
@@ -101,3 +96,10 @@ jobs:
           aws lambda update-function-code \
             --function-name "${{ secrets.AUTH_LAMBDA_NAME }}" \
             --zip-file fileb://auth-cpf.zip
+          if [ -n "${{ secrets.NOTIFY_LAMBDA_NAME }}" ]; then
+            aws lambda update-function-code \
+              --function-name "${{ secrets.NOTIFY_LAMBDA_NAME }}" \
+              --zip-file fileb://notify-os.zip
+          else
+            echo "NOTIFY_LAMBDA_NAME unset — skip notify-os deploy"
+          fi

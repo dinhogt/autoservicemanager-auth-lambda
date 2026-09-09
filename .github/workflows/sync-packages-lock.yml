@@ -5,6 +5,13 @@ name: Sync Packages yarn.lock
 
 on:
   workflow_dispatch:
+  # Also run when this file lands on develop (default branch may still be master).
+  push:
+    branches: [develop]
+    paths:
+      - '.github/workflows/sync-packages-lock.yml'
+      - 'package.json'
+      - '.npmrc'
 
 permissions:
   contents: write

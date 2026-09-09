@@ -2,6 +2,7 @@ import * as esbuild from 'esbuild';
 import { mkdirSync } from 'node:fs';
 
 mkdirSync('dist', { recursive: true });
+mkdirSync('dist/notify-os', { recursive: true });
 
 await esbuild.build({
   entryPoints: ['src/handler.ts'],
@@ -12,9 +13,21 @@ await esbuild.build({
   format: 'cjs',
   sourcemap: false,
   minify: true,
-  // @aws-sdk is large; keep bundled for single-zip deploy (<5MB target).
   external: [],
   logLevel: 'info',
 });
 
-console.log('esbuild: dist/handler.js');
+await esbuild.build({
+  entryPoints: ['src/notify-os/handler.ts'],
+  bundle: true,
+  platform: 'node',
+  target: 'node22',
+  outfile: 'dist/notify-os/handler.js',
+  format: 'cjs',
+  sourcemap: false,
+  minify: true,
+  external: [],
+  logLevel: 'info',
+});
+
+console.log('esbuild: dist/handler.js + dist/notify-os/handler.js');
