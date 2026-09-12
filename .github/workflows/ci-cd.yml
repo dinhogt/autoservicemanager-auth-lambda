@@ -71,7 +71,11 @@ jobs:
           retention-days: 3
 
   cd:
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop')
+    # OIDC CD opcional: ENABLE_OIDC_CD=true + AWS_ROLE_ARN. Caso contrário deploy via deploy-aws.sh.
+    if: >-
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop') &&
+      vars.ENABLE_OIDC_CD == 'true'
     needs: [ci, security-gate]
     runs-on: ubuntu-latest
     timeout-minutes: 10
